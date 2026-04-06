@@ -48,4 +48,6 @@ Robust Calculator with Overwrite UI
 Stopwatch Mode (Case 2 - In Progress)
 System Shutdown Sequence (Case 0)
 Mini-Games (Future Updates)
-Developed with ❤️ by Shawn-Yu-Dev
+Developed with 
+
+❤️ by Shawn-Yu-Dev
