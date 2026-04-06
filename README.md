@@ -29,14 +29,12 @@ A sophisticated terminal-based "Operating System" simulation built in C++. This 
 
 ### Compilation
 Use the following command to compile the system:
-```bash
+bash
 g++ -std=c++17 -o shawn_os main.cpp
-Use code with caution.
 
 Running the System
 bash
 ./shawn_os
-Use code with caution.
 
 🛠️ Controls
 Main Menu: Enter the corresponding number (0-7) to launch an app.
