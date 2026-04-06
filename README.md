@@ -33,6 +33,7 @@ Use the following command to compile the system:
    g++ -std=c++17 -o shawn_os main.cpp
 
 Running the System:
+
 2. bash:
    ./shawn_os
 
