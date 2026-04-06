@@ -30,11 +30,11 @@ A sophisticated terminal-based "Operating System" simulation built in C++. This 
 ### Compilation
 Use the following command to compile the system:
 1. bash
-   g++ -std=c++17 -o shawn_os main.cpp
+      g++ -std=c++17 -o shawn_os main.cpp
 
-Running the System
+Running the System:
 2. bash
-  ./shawn_os
+     ./shawn_os
 
 🛠️ Controls
 Main Menu: Enter the corresponding number (0-7) to launch an app.
