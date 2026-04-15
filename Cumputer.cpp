@@ -1,194 +1,257 @@
 #include <iostream>
 #include <iomanip>
-#include <cmath>
-#include <ctime>
 #include <string>
 #include <chrono>
 #include <thread>
 #include <termios.h>
 #include <unistd.h>
-#include <ncurses.h>
 #include <fcntl.h> 
 #include <limits>
-#include <atomic> 
+#include <ctime>
+
 using namespace std;
 using namespace chrono;
-using namespace chrono_literals;
 using namespace this_thread;
-void setEcho(bool enable) 
-{
+
+// --- 全局配置 ---
+const int REFRESH_RATE = 100;  // 毫秒
+
+// --- 终端控制工具 ---
+void clearScreen() { 
+    system("clear");
+}
+
+void setEcho(bool enable) {
     struct termios tty;
     tcgetattr(STDIN_FILENO, &tty);
-    if (!enable) tty.c_lflag &= ~ECHO;
-    else tty.c_lflag |= ECHO;
+    if (enable) tty.c_lflag |= ECHO;
+    else tty.c_lflag &= ~ECHO;
     tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 }
-int kbhit() 
-{
+
+int kbhit() {
     struct termios oldt, newt;
-    int ch;
-    int oldf;
+    int ch, oldf;
+    
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
     fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    
     ch = getchar();
+    
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fcntl(STDIN_FILENO, F_SETFL, oldf);
-    if(ch != EOF) 
-    {
-        ungetc(ch, stdin); 
+    
+    if (ch != EOF) {
+        ungetc(ch, stdin);
         return 1;
     }
     return 0;
 }
-atomic<bool> Run1(true);
-void showtime() 
-{
+
+void loadingBar(const string& msg) {
+    cout << msg << " [" << flush;
+    for (int i = 0; i < 20; ++i) {
+        cout << "=" << flush;
+        sleep_for(milliseconds(50));
+    }
+    cout << "] Done!\n";
+}
+
+// --- 时钟功能 ---
+void showtime() {
+    clearScreen();
+    cout << "======= SYSTEM CLOCK =======\n";
+    cout << "[SPACE] Pause/Resume  |  [Q] Back\n";
+    cout << "=============================\n\n";
+    
+    struct termios oldt, newt;
+    tcgetattr(STDIN_FILENO, &oldt);           
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);         
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);  
+
     bool paused = false;
-    cout << "\n--- Clock Started ---" << endl;
-    cout << "Controls: [Space] Pause/Resume" << endl;
+    
     while (true) {
         if (kbhit()) {
             char key = getchar();
-            if (key == ' ') 
-            {
-                paused = !paused; 
-            } 
-            else if (key == 'q' || key == 'Q') 
-            {
-                cout << "\nExiting Clock...\n";break; 
+            if (key == ' ') {
+                paused = !paused;
+            } else if (tolower(key) == 'q') {
+                break;
             }
         }
-        if (!paused) {
-            auto now = system_clock::now();
-            time_t now_c = system_clock::to_time_t(now);
-            cout << "\rCurrent Time:" << put_time(localtime(&now_c), "%H:%M:%S") 
-                 << " [Running]" << flush;
-        } else {cout << "\rCurrent Time: [ Paused ]" << flush;}
-        sleep_for(100ms); 
+        
+        auto now = system_clock::to_time_t(system_clock::now());
+        cout << "\r   Time: " << put_time(localtime(&now), "%H:%M:%S") 
+             << "  |  " << (paused ? "⏸ PAUSED" : "▶ RUNNING") 
+             << "         " << flush;
+        
+        sleep_for(milliseconds(REFRESH_RATE));
     }
+    
+    cout << "\n";
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); 
 }
-void Calculator() 
-{
-    char a;
-    cout << "Hello! Welcome to this calculator. Would you like a tutorial? (Y/n)\n";
-    cin >> a;
-    if (a=='Y' || a=='y')
-    {
-        cout << "1. Please do not enter any letters (otherwise it will crash).\n";
-        cout << "2. Please use the format [number][operator][number].\n";
-        cout << "3. Calculation (Type '0 q 0' to exit)\n";
-    }
-    cout << "So, press any key to start the calculation!   ";
-    string b;
-    cin >> b;
-    while (true)
-    {
-        cout << "Calculation:";
-        long double num1,num2 ;
+
+// --- 计算器功能 ---
+void calculator() {
+    clearScreen();
+    cout << "======= CALCULATOR =======\n";
+    cout << "Usage: [number] [operator] [number]\n";
+    cout << "Enter '0 q 0' to exit\n";
+    cout << "==========================\n\n";
+    
+    while (true) {
+        long double num1, num2, result;
         char op;
-        if (!(cin >> num1 >> op >> num2)) 
-        {
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
-            cout << "Invalid input format. Please try again.\n" ;
-            continue;
-        }
-        if (op=='q' || op=='Q')
-        {
-            cout << "Returning to menu...\n";
-            break;
-        }
-        cout << "\033[A\rCalculation:" << num1 << " " << op << " " << num2 << " = ";
-        switch (op) 
-        {
-            case '+': cout << num1 + num2; break;
-            case '-': cout << num1 - num2; break;
-            case '*': cout << num1 * num2; break;
-            case '/': 
-                if (num2 == 0) cout << "Error: Division by zero!";
-                else cout << num1 / num2;
-                break;
-            default: cout << "Error: Unknown operator '" << op << "'";
-        }
-        cout << "\n";
-    }
-}
-void menu()
-{
-    cout << "1. Clock (1)\n";
-    cout << "2. Stopwatch (2)\n";
-    cout << "3. Calculator (3)\n";
-    cout << "4. Stay tuned.\n";
-    cout << "5. Stay tuned.\n";
-    cout << "6. Stay tuned.\n";
-    cout << "7. Stay tuned.\n";
-}
-int main() 
-{
-    cout << "Booting up...\n" ;
-    sleep_for(1s);
-    string name;
-    cout << "\033[2J\033[1;1H" << flush 
-         <<"Welcome to the computer system developed by Shawn_Yu.\n " 
-         << " I will guide you through its use.\nI will guide you through its use.";
-    cin >> name;
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    string password,passwords;
-    cout << "OK," << name << ".\n";
-    while (true) 
-    {
-        setEcho(false); // 关闭回显
-        cout << "Please set your login password (at least 6 characters):";
-        getline(cin, password);
-        setEcho(true); // 恢复回显
-        cout << "\n";
-    if (password.length() >= 6) break;
-    cout << "[Error] Password is too short. Please enter it again.\n" ;
-    }
-    while (true) 
-    {
-        setEcho(false);
-        cout << "Please enter again to confirm:";
-        getline(cin, passwords);
-        setEcho(true);
-        cout << endl;
-        if (password == passwords) {
-            cout << "✅ Password set successfully!\n";
-            break;
-        } else {
-            cout << "[Error] The two inputs do not match! Please verify again.\n";  
-        }
-    }
-    cout << "Next, proceed to download the software; "
-         << "simply select the version you need, enter the code, and you are ready to run it.\n";
-    sleep_for(500ms);
-    cout << "[Q] Exit to Main Menu   [0] Shut Down\n";
-    while (true){
-        int a;
-        menu();
-        if (!(cin >> a)) 
-        { 
+        
+        cout << "> ";
+        if (!(cin >> num1 >> op >> num2)) {
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Please enter a number (0-7).\n";
+            cout << "❌ Invalid input format\n";
             continue;
         }
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        while (a<0 || a>7){cout << "Incorrect. Please try again.";cin >> a;}
-        printf("Getting ready...");
-        sleep_for(1s);
-        switch(a) 
-        {
-            case 0:cout << "The shutdown feature is still under development.";break;
-            case 1:showtime();break;
-            case 2:cout << "Stopwatch feature under development...\n";break;
-            case 3:Calculator();break;
-            default:cout << "This feature has not yet been installed.\n";break;
+        
+        if (tolower(op) == 'q') break;
+        
+        bool valid = true;
+        
+        switch (op) {
+            case '+':
+                result = num1 + num2;
+                break;
+            case '-':
+                result = num1 - num2;
+                break;
+            case '*':
+                result = num1 * num2;
+                break;
+            case '/':
+                if (num2 == 0) {
+                    cout << "❌ Division by zero error\n";
+                    valid = false;
+                } else {
+                    result = num1 / num2;
+                }
+                break;
+            default:
+                cout << "❌ Unknown operator: " << op << "\n";
+                valid = false;
+        }
+        
+        if (valid) {
+            cout << fixed << setprecision(6) << num1 << " " << op << " " 
+                 << num2 << " = " << result << "\n";
+        }
+        cout << "\n";
+    }
+    
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+// --- 菜单显示 ---
+void displayMenu(const string& username) {
+    cout << "\n╔════════════════════════════════╗\n";
+    cout << "║  Welcome, " << setw(19) << left << username << "║\n";
+    cout << "╚════════════════════════════════╝\n";
+    cout << "=============================\n";
+    cout << "  [1] Clock      \n";
+    cout << "  [2] Calculator \n";
+    cout << "  [0] Screen Off  \n";
+    cout << "  [Q] Logout      \n";
+    cout << "=============================\n";
+}
+// --- 用户认证 ---
+string authenticate() {
+    clearScreen();
+    string username;
+    
+    cout << "\n╔════════════════════════════════╗\n";
+    cout << "║   USER REGISTRATION             ║\n";
+    cout << "╚════════════════════════════════╝\n\n";
+    
+    cout << "Username: ";
+    getline(cin, username);
+    
+    if (username.empty()) {
+        cout << "❌ Username cannot be empty!\n";
+        sleep_for(seconds(1));
+        return authenticate();
+    }
+    
+    string password, password_confirm;
+    
+    while (true) {
+        setEcho(false);
+        cout << "Password (min 6 chars): ";
+        getline(cin, password);
+        cout << "\nConfirm Password: ";
+        getline(cin, password_confirm);
+        setEcho(true);
+        cout << "\n";
+        
+        if (password.length() < 6) {
+            cout << "❌ Password too short (min 6 characters)\n\n";
+            continue;
+        }
+        
+        if (password != password_confirm) {
+            cout << "❌ Passwords do not match\n\n";
+            continue;
+        }
+        
+        cout << "✅ Account created successfully!\n";
+        sleep_for(seconds(1));
+        return username;
+    }
+}
+
+// --- 主函数 ---
+int main() {
+    clearScreen();
+    loadingBar("System Booting");
+    
+    string username = authenticate();
+    clearScreen();
+    
+    while (true) {
+        displayMenu(username);
+        string input;
+        getline(cin, input);
+        
+        if (input.empty()) continue;
+        
+        char cmd = tolower(input[0]);
+        
+        if (cmd == 'q') {
+            cout << "\nGoodbye, " << username << "!\n";
+            break;
+        }
+        
+        clearScreen();
+        
+        switch (cmd) {
+            case '1':
+                showtime();
+                break;
+            case '2':
+                calculator();
+                break;
+            case '0':
+                loadingBar("System Shutdown");
+                return 0;
+            default:
+                cout << "⏳ Feature coming soon...\n";
+                sleep_for(seconds(2));
+                clearScreen();
         }
     }
+    
     return 0;
 }
